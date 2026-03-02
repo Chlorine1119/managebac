@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "MB Grade Filler",
+  "version": "0.1.0",
+  "description": "批量填入 ManageBac 成绩，告别逐个输入",
+  "permissions": ["activeTab", "storage", "clipboardRead"],
+  "host_permissions": ["https://*.managebac.com/*"],
+  "action": {
+    "default_popup": "popup/index.html",
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "48": "assets/icon-48.png",
+      "128": "assets/icon-128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://*.managebac.com/*"],
+      "js": [
+        "utils/selectors.js",
+        "content/mb-detector.js",
+        "content/mb-parser.js",
+        "content/mb-filler.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "icons": {
+    "16": "assets/icon-16.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  }
+}

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MB Grade Filler</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="app-header">
+        <h1>MB Grade Filler</h1>
+        <p id="pageHint">正在检测页面...</p>
+      </header>
+
+      <section id="notGradePage" class="panel hidden">
+        <h2>请先打开成绩页面</h2>
+        <p>请先进入 ManageBac 的班级作业成绩录入页面，再打开扩展。</p>
+      </section>
+
+      <section id="stepGrab" class="panel hidden">
+        <div class="step-title">Step 1 · GRAB（抓取数据）</div>
+        <div class="meta" id="pageMeta"></div>
+
+        <label class="label" for="scoreInput">从 Excel 粘贴（姓名 + 分数）</label>
+        <textarea id="scoreInput" placeholder="王小明	88&#10;李华	92"></textarea>
+
+        <div class="row">
+          <label class="file-btn" for="csvFile">上传 CSV 文件</label>
+          <input id="csvFile" type="file" accept=".csv,text/csv" />
+          <button id="useCachedBtn" class="secondary hidden" type="button">使用上次数据（平行班）</button>
+        </div>
+
+        <div class="actions">
+          <button id="toCheckBtn" type="button">下一步 →</button>
+        </div>
+      </section>
+
+      <section id="stepCheck" class="panel hidden">
+        <div class="step-title">Step 2 · CHECK（确认匹配）</div>
+        <p id="matchSummary"></p>
+        <div id="matchList" class="match-list"></div>
+
+        <div class="actions split">
+          <button id="backToGrabBtn" type="button" class="secondary">← 上一步</button>
+          <button id="startFillBtn" type="button">开始填入 →</button>
+        </div>
+      </section>
+
+      <section id="stepFill" class="panel hidden">
+        <div class="step-title">Step 3 · FILL（自动填入）</div>
+
+        <div class="progress-wrap">
+          <div id="progressText">准备中...</div>
+          <div class="progress-bar">
+            <div id="progressBarInner"></div>
+          </div>
+        </div>
+
+        <div id="fillLog" class="log"></div>
+
+        <label class="checkbox-row">
+          <input id="cacheDataCheckbox" type="checkbox" checked />
+          缓存本次数据用于平行班
+        </label>
+
+        <div class="actions">
+          <button id="finishBtn" type="button" class="secondary">完成</button>
+        </div>
+      </section>
+
+      <section id="toast" class="toast hidden"></section>
+    </main>
+
+    <script type="module" src="index.js"></script>
+  </body>
+</html>
