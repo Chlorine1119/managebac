@@ -79,6 +79,23 @@ textarea {
   line-height: 1.5;
 }
 
+.task-selector {
+  margin-top: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  background: #f9fafb;
+}
+
+.task-select {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  background: #fff;
+}
+
 .row {
   margin-top: 8px;
   display: flex;

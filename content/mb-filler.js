@@ -13,10 +13,7 @@
   }
 
   function setInputValue(input, value) {
-    const nativeSetter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      "value"
-    )?.set;
+    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
 
     input.focus();
 
@@ -43,13 +40,39 @@
     return Array.from(document.querySelectorAll(rowSelector));
   }
 
-  function pickInputFromRow(row) {
+  function collectInputs(row) {
     const preferred = selectors.studentList?.gradeInput;
     if (preferred) {
-      const target = row.querySelector(preferred);
-      if (target) return target;
+      const nodes = Array.from(row.querySelectorAll(preferred));
+      if (nodes.length) return nodes;
     }
-    return row.querySelector("input, [contenteditable='true']");
+    return Array.from(row.querySelectorAll("input, [contenteditable='true']"));
+  }
+
+  function escapeAttrValue(value) {
+    return String(value || "").replace(/"/g, '\\"');
+  }
+
+  function pickInputFromRow(row, task) {
+    const inputs = collectInputs(row);
+    if (!inputs.length) return null;
+
+    if (task?.id) {
+      const attr = selectors.taskList?.taskIdAttr || "data-task-id";
+      const escapedTaskId = escapeAttrValue(task.id);
+      const direct =
+        row.querySelector(`[${attr}="${escapedTaskId}"]`) ||
+        row.querySelector(`[data-task-id="${escapedTaskId}"]`) ||
+        row.querySelector(`[name*="${escapedTaskId}"]`) ||
+        row.querySelector(`[id*="${escapedTaskId}"]`);
+      if (direct) return direct;
+    }
+
+    if (typeof task?.index === "number" && task.index >= 0 && task.index < inputs.length) {
+      return inputs[task.index];
+    }
+
+    return inputs[0];
   }
 
   function pickNameFromRow(row) {
@@ -80,12 +103,12 @@
     );
   }
 
-  function buildInputMap() {
+  function buildInputMap(task) {
     const rows = pickRows();
     const map = new Map();
 
     rows.forEach((row, index) => {
-      const input = pickInputFromRow(row);
+      const input = pickInputFromRow(row, task);
       if (!input) return;
       const name = pickNameFromRow(row);
       const studentId = pickStudentId(row, input, index);
@@ -96,8 +119,8 @@
     return map;
   }
 
-  async function fillGrades(items) {
-    const inputMap = buildInputMap();
+  async function fillGrades(items, task) {
+    const inputMap = buildInputMap(task);
     const results = [];
 
     for (let index = 0; index < items.length; index += 1) {
@@ -112,7 +135,7 @@
           studentId: item.studentId,
           studentName: item.studentName || item.importedName || "",
           score: item.score,
-          reason: "输入框未找到"
+          reason: `任务[${task?.name || task?.id || "默认"}]输入框未找到`
         };
         results.push(failed);
         chrome.runtime.sendMessage({ type: "FILL_PROGRESS", index: index + 1, total: items.length, result: failed });
@@ -157,7 +180,7 @@
       failed: results.filter((r) => r.status === "failed").length
     };
 
-    const payload = { type: "FILL_COMPLETE", summary, results };
+    const payload = { type: "FILL_COMPLETE", summary, results, task };
     chrome.runtime.sendMessage(payload, () => {
       void chrome.runtime.lastError;
     });
@@ -170,7 +193,8 @@
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === "FILL_GRADES") {
       const items = Array.isArray(message.items) ? message.items : [];
-      fillGrades(items)
+      const task = message.task || null;
+      fillGrades(items, task)
         .then((data) => sendResponse({ ok: true, ...data }))
         .catch((error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : "填入失败" }));
       return true;

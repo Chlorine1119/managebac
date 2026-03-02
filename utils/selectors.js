@@ -7,11 +7,17 @@
       urlPattern: /\/classes\/([^/]+)\/tasks\/([^/?#]+)/i,
       altUrlPattern: /\/classes\/([^/]+)\/(?:assessments|gradebook|assignments)\/([^/?#]+)/i
     },
+    taskList: {
+      table: 'table.gradebook-table, table[data-component="gradebook"], table',
+      headerRow: 'thead tr, [role="rowgroup"] [role="row"]',
+      headerCell: 'th, [role="columnheader"]',
+      taskIdAttr: 'data-task-id'
+    },
     studentList: {
       container: 'table tbody, [role="rowgroup"], .student-grades-list',
       row: 'tr[data-student-id], tr, [role="row"], .student-row',
       nameCell: '[data-student-name], td.student-name, .student-name-cell, [data-column="student"], [aria-label*="student"], td:first-child',
-      gradeInput: 'input[data-student-id], input[type="text"], input[type="number"], [contenteditable="true"]',
+      gradeInput: 'input[data-student-id], input[data-task-id], input[type="text"], input[type="number"], [contenteditable="true"]',
       studentIdAttr: 'data-student-id'
     },
     pageInfo: {

@@ -25,6 +25,12 @@
         <label class="label" for="scoreInput">从 Excel 粘贴（姓名 + 分数）</label>
         <textarea id="scoreInput" placeholder="王小明	88&#10;李华	92"></textarea>
 
+        <div id="taskSelectorWrap" class="task-selector hidden">
+          <label class="label" for="taskSelect">选择要录入的 Task</label>
+          <select id="taskSelect" class="task-select"></select>
+          <p id="taskHint" class="meta"></p>
+        </div>
+
         <div class="row">
           <label class="file-btn" for="csvFile">上传 CSV / Excel 文件</label>
           <input id="csvFile" type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />

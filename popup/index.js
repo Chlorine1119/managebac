@@ -1,6 +1,10 @@
 import { parseScoreText, parseCsvFile } from "../utils/csv-parser.js";
 import { parseXlsxFile } from "../utils/xlsx-parser.js";
-import { matchImportedToStudents, buildMappingFromManualAdjustments, findById } from "../utils/name-matcher.js";
+import {
+  matchImportedToStudents,
+  buildMappingFromManualAdjustments,
+  findById
+} from "../utils/name-matcher.js";
 
 const ui = {
   notGradePage: document.getElementById("notGradePage"),
@@ -11,6 +15,9 @@ const ui = {
   pageMeta: document.getElementById("pageMeta"),
   scoreInput: document.getElementById("scoreInput"),
   csvFile: document.getElementById("csvFile"),
+  taskSelectorWrap: document.getElementById("taskSelectorWrap"),
+  taskSelect: document.getElementById("taskSelect"),
+  taskHint: document.getElementById("taskHint"),
   useCachedBtn: document.getElementById("useCachedBtn"),
   toCheckBtn: document.getElementById("toCheckBtn"),
   backToGrabBtn: document.getElementById("backToGrabBtn"),
@@ -29,6 +36,8 @@ const state = {
   tabId: null,
   pageInfo: null,
   students: [],
+  tasks: [],
+  selectedTaskId: "",
   importedRows: [],
   matchedRows: [],
   fillPayload: [],
@@ -133,6 +142,40 @@ function renderSummary(summary) {
   ui.matchSummary.textContent = `匹配结果：${summary.exact + summary.normalized + summary.mapped}/${summary.total} 精确匹配，${summary.contains + summary.fuzzy} 模糊匹配，${summary.unmatched} 未匹配`;
 }
 
+function renderTaskSelector() {
+  const tasks = Array.isArray(state.tasks) ? state.tasks : [];
+
+  if (!tasks.length) {
+    ui.taskSelectorWrap.classList.add("hidden");
+    ui.taskSelect.innerHTML = "";
+    ui.taskHint.textContent = "";
+    state.selectedTaskId = "";
+    return;
+  }
+
+  ui.taskSelectorWrap.classList.remove("hidden");
+  ui.taskSelect.innerHTML = "";
+
+  tasks.forEach((task) => {
+    const option = document.createElement("option");
+    option.value = task.id;
+    option.textContent = task.name || `Task ${task.index + 1}`;
+    ui.taskSelect.appendChild(option);
+  });
+
+  if (!state.selectedTaskId || !tasks.some((task) => task.id === state.selectedTaskId)) {
+    state.selectedTaskId = tasks[0].id;
+  }
+
+  ui.taskSelect.value = state.selectedTaskId;
+  ui.taskHint.textContent = `检测到 ${tasks.length} 个任务列，请选择本次要录入的 Task。`;
+}
+
+function getSelectedTask() {
+  if (!state.tasks.length) return null;
+  return state.tasks.find((task) => task.id === state.selectedTaskId) || state.tasks[0] || null;
+}
+
 async function loadCachedAvailability() {
   try {
     const response = await sendMessage({ type: "GET_CACHED_DATA" });
@@ -141,6 +184,29 @@ async function loadCachedAvailability() {
     }
   } catch (_err) {
     // ignore
+  }
+}
+
+async function refreshPageContext() {
+  try {
+    const response = await sendMessage({ type: "PARSE_STUDENTS", tabId: state.tabId });
+    state.students = response.students || [];
+    state.tasks = response.tasks || [];
+    renderTaskSelector();
+
+    const metaParts = [
+      `${state.pageInfo.className || "未知班级"}`,
+      `${state.pageInfo.taskName || "未知作业"}`,
+      `学生 ${state.students.length} 人`
+    ];
+
+    if (state.tasks.length) {
+      metaParts.push(`任务 ${state.tasks.length} 个`);
+    }
+
+    ui.pageMeta.textContent = metaParts.join(" · ");
+  } catch (_error) {
+    ui.pageMeta.textContent = `${state.pageInfo.className || "未知班级"} · ${state.pageInfo.taskName || "未知作业"}`;
   }
 }
 
@@ -157,8 +223,8 @@ async function bootstrap() {
     }
 
     ui.pageHint.textContent = "已检测到 ManageBac 成绩页面";
-    ui.pageMeta.textContent = `${state.pageInfo.className || "未知班级"} · ${state.pageInfo.taskName || "未知作业"}`;
     setVisible("stepGrab");
+    await refreshPageContext();
     await loadCachedAvailability();
   } catch (error) {
     ui.pageHint.textContent = "页面检测失败";
@@ -170,6 +236,9 @@ async function bootstrap() {
 async function parseStudents() {
   const response = await sendMessage({ type: "PARSE_STUDENTS", tabId: state.tabId });
   state.students = response.students || [];
+  state.tasks = response.tasks || [];
+  renderTaskSelector();
+
   if (!state.students.length) {
     throw new Error("未解析到学生列表，请确认页面已完整加载");
   }
@@ -225,7 +294,7 @@ async function moveToCheck() {
 }
 
 function buildFillPayload() {
-  const payload = state.matchedRows
+  return state.matchedRows
     .filter((row) => row.selectedStudentId && String(row.score || "").trim() !== "")
     .map((row) => ({
       importedName: row.importedName,
@@ -233,8 +302,6 @@ function buildFillPayload() {
       studentName: row.selectedStudentName,
       score: String(row.score || "").trim()
     }));
-
-  return payload;
 }
 
 async function startFill() {
@@ -244,21 +311,31 @@ async function startFill() {
       throw new Error("没有可填入的数据，请先确认匹配关系");
     }
 
+    const selectedTask = getSelectedTask();
+    if (state.tasks.length && !selectedTask) {
+      throw new Error("请先选择要录入的 Task");
+    }
+
     state.fillInProgress = true;
     ui.fillLog.innerHTML = "";
     ui.progressText.textContent = `正在填入... 0/${state.fillPayload.length}`;
     ui.progressBarInner.style.width = "0%";
+
+    if (selectedTask) {
+      appendLog(`🎯 当前录入任务：${selectedTask.name || selectedTask.id}`);
+    }
 
     setVisible("stepFill");
 
     const response = await sendMessage({
       type: "FILL_GRADES",
       tabId: state.tabId,
+      task: selectedTask,
       items: state.fillPayload
     });
 
     if (state.fillInProgress) {
-      finalizeFill(response.summary, response.results || []);
+      finalizeFill(response.summary, response.results || [], response.task || selectedTask);
     }
   } catch (error) {
     state.fillInProgress = false;
@@ -266,12 +343,16 @@ async function startFill() {
   }
 }
 
-async function finalizeFill(summary, results) {
+async function finalizeFill(summary, results, task) {
   if (!summary) return;
 
   state.fillInProgress = false;
   ui.progressText.textContent = `完成：成功 ${summary.success}/${summary.total}，失败 ${summary.failed}`;
   ui.progressBarInner.style.width = "100%";
+
+  if (task?.name || task?.id) {
+    appendLog(`🧾 任务：${task.name || task.id}`);
+  }
 
   appendLog(`✅ 填入完成：成功 ${summary.success}，失败 ${summary.failed}`);
 
@@ -299,6 +380,10 @@ async function finalizeFill(summary, results) {
     appendLog("🧠 已保存手动匹配映射，下次自动应用。");
   }
 }
+
+ui.taskSelect.addEventListener("change", (event) => {
+  state.selectedTaskId = event.target.value;
+});
 
 ui.toCheckBtn.addEventListener("click", moveToCheck);
 ui.backToGrabBtn.addEventListener("click", () => setVisible("stepGrab"));
@@ -336,7 +421,7 @@ chrome.runtime.onMessage.addListener((message) => {
   }
 
   if (message?.type === "FILL_COMPLETE") {
-    finalizeFill(message.summary, message.results || []).catch((error) => {
+    finalizeFill(message.summary, message.results || [], message.task).catch((error) => {
       showToast(error instanceof Error ? error.message : "收尾处理失败");
     });
   }

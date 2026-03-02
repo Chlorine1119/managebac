@@ -25,14 +25,46 @@
     return "";
   }
 
-  function pickInputFromRow(row) {
+  function collectInputs(row) {
     const preferred = selectors.studentList?.gradeInput;
     if (preferred) {
-      const target = row.querySelector(preferred);
-      if (target) return target;
+      const nodes = Array.from(row.querySelectorAll(preferred));
+      if (nodes.length) return nodes;
+    }
+    return Array.from(row.querySelectorAll("input, [contenteditable='true']"));
+  }
+
+  function normalizeTaskId(taskId) {
+    return String(taskId || "").trim();
+  }
+
+  function escapeAttrValue(value) {
+    return value.replace(/"/g, '\\"');
+  }
+
+  function pickInputFromRow(row, task) {
+    const inputs = collectInputs(row);
+    if (!inputs.length) return null;
+
+    if (task?.id) {
+      const normalizedTaskId = normalizeTaskId(task.id);
+      const attr = selectors.taskList?.taskIdAttr || "data-task-id";
+      const escaped = escapeAttrValue(normalizedTaskId);
+
+      const direct =
+        row.querySelector(`[${attr}="${escaped}"]`) ||
+        row.querySelector(`[data-task-id="${escaped}"]`) ||
+        row.querySelector(`[name*="${escaped}"]`) ||
+        row.querySelector(`[id*="${escaped}"]`);
+
+      if (direct) return direct;
     }
 
-    return row.querySelector("input, [contenteditable='true']");
+    if (typeof task?.index === "number" && task.index >= 0 && task.index < inputs.length) {
+      return inputs[task.index];
+    }
+
+    return inputs[0];
   }
 
   function pickStudentId(row, input, index) {
@@ -61,13 +93,49 @@
     };
   }
 
+  function parseTaskList() {
+    const tableSelector = selectors.taskList?.table || "table";
+    const table = document.querySelector(tableSelector);
+    if (!table) return [];
+
+    const headerRowSelector = selectors.taskList?.headerRow || "thead tr";
+    const headerCellSelector = selectors.taskList?.headerCell || "th";
+    const headerRow = table.querySelector(headerRowSelector);
+    if (!headerRow) return [];
+
+    const headerCells = Array.from(headerRow.querySelectorAll(headerCellSelector));
+    if (headerCells.length <= 1) return [];
+
+    const attr = selectors.taskList?.taskIdAttr || "data-task-id";
+
+    return headerCells
+      .slice(1)
+      .map((cell, index) => {
+        const name = textOf(cell) || `Task ${index + 1}`;
+        const taskId =
+          cell.getAttribute(attr) ||
+          cell.getAttribute("data-task-id") ||
+          cell.dataset?.taskId ||
+          `task-${index + 1}`;
+
+        return {
+          id: String(taskId),
+          name,
+          index
+        };
+      })
+      .filter((task) => task.name);
+  }
+
   function parseGradePage() {
     const rowSelector = selectors.studentList?.row || "tr";
     const rows = Array.from(document.querySelectorAll(rowSelector));
+    const tasks = parseTaskList();
+    const activeTask = tasks[0] || null;
     const students = [];
 
     rows.forEach((row, index) => {
-      const inputElement = pickInputFromRow(row);
+      const inputElement = pickInputFromRow(row, activeTask);
       if (!inputElement) return;
 
       const name = pickNameFromRow(row);
@@ -95,6 +163,7 @@
 
     return {
       students,
+      tasks,
       totalCount: students.length,
       pageInfo: getPageInfo()
     };
