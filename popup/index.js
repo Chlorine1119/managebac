@@ -1,4 +1,5 @@
 import { parseScoreText, parseCsvFile } from "../utils/csv-parser.js";
+import { parseXlsxFile } from "../utils/xlsx-parser.js";
 import { matchImportedToStudents, buildMappingFromManualAdjustments, findById } from "../utils/name-matcher.js";
 
 const ui = {
@@ -181,13 +182,20 @@ async function parseImportedRows() {
   let parsed;
 
   if (file) {
-    parsed = await parseCsvFile(file, { pageStudents: state.students });
+    const filename = String(file.name || "").toLowerCase();
+    const isXlsx = filename.endsWith(".xlsx") || file.type.includes("spreadsheetml");
+
+    if (isXlsx) {
+      parsed = await parseXlsxFile(file, { pageStudents: state.students });
+    } else {
+      parsed = await parseCsvFile(file, { pageStudents: state.students });
+    }
   } else {
     parsed = parseScoreText(ui.scoreInput.value, { pageStudents: state.students });
   }
 
   if (!parsed.rows.length) {
-    throw new Error("没有可用分数数据，请检查粘贴内容或 CSV 文件");
+    throw new Error("没有可用分数数据，请检查粘贴内容或 CSV/Excel 文件");
   }
 
   state.importedRows = parsed.rows;
